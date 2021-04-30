@@ -4,6 +4,13 @@
 #include <cstdint> 	/* int64_t, uint64_t */
 #include <cstdlib>	/* RAND_MAX */
 
+#include<stdio.h>
+#include<cuda.h>
+#include<cuda_runtime.h>
+
+void cpuToGpuMemcpy(uint64_t* h_data,uint64_t* d_data,uint64_t size) ;
+void gpuToCpuMemcpy(uint64_t* d_data,uint64_t* h_data,uint64_t size) ;
+
 /**
  * Return vector with each element of the input at its bit-reversed position
  *
