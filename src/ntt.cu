@@ -7,7 +7,8 @@
 #include "../include/ntt.h" 	//INCLUDE HEADER FILE
 
 
-__global__ void blockComputation(float *,float*,float*,int) ;
+__global__ void blockComputation(uint64_t*,uint64_t,uint64_t,uint64_t,uint64_t) ;
+void blockComp(uint64_t* , uint64_t ,uint64_t,uint64_t ,uint64_t) ;
 
 
 /**
@@ -59,7 +60,7 @@ uint64_t *inPlaceNTT_DIT(uint64_t *vec, uint64_t n, uint64_t p, uint64_t r, bool
 			}
 		}
         */
-        blockComp(result,n,m) ;
+        blockComp(result,n,m,a,p) ;
 
 	}
 
@@ -67,16 +68,17 @@ uint64_t *inPlaceNTT_DIT(uint64_t *vec, uint64_t n, uint64_t p, uint64_t r, bool
 
 }
 
-void blockComp(uint64* res, int resLength,int blockSize)
+void blockComp(uint64_t* res, uint64_t resLength,uint64_t blockSize,uint64_t a,uint64_t p)
 {
     uint64_t* cuda_result ;
-    int size = resLength*sizeof(uint64_t) ;
+    uint64_t size = resLength*sizeof(uint64_t) ;
     cudaMalloc(&cuda_result,sizeOfRes) ;
     cpuToGpuMemcpy(res,cuda_result,sizeOfRes) ;
 
     int tpb = blockSize;
     int bpg = (n+tpb-1)/tpb ;
 
+    blockComputation<<<bpg,tpb>>>(cuda_result,n,m,a,p) ;
     cudaError_t err = cudaGetLastError() ;
 
 	if(err != cudaSuccess)
@@ -88,10 +90,11 @@ void blockComp(uint64* res, int resLength,int blockSize)
     gpuToCpuMemcpy(cuda_result,res,sizeOfRes) ;
 }
 
-__global__ void blockComputation(uint64_t* result, int n)
+__global__ void blockComputation(uint64_t* result, uint64_t n,uint64_t m,uint64_t a,uint64_t p)
 {
 	int j=blockDim.x*blockIdx.x ;
-    int k=threadIdx.x
+    int k=threadIdx.x ;
+    uint64_t factor1,factor2 ;
 	if(j < n){
         if(k < m/2){
             factor1 = result[j + k];
