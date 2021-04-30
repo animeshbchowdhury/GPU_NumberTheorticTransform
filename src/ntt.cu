@@ -71,14 +71,14 @@ uint64_t *inPlaceNTT_DIT(uint64_t *vec, uint64_t n, uint64_t p, uint64_t r, bool
 void blockComp(uint64_t* res, uint64_t resLength,uint64_t blockSize,uint64_t a,uint64_t p)
 {
     uint64_t* cuda_result ;
-    uint64_t size = resLength*sizeof(uint64_t) ;
+    uint64_t sizeOfRes = resLength*sizeof(uint64_t) ;
     cudaMalloc(&cuda_result,sizeOfRes) ;
     cpuToGpuMemcpy(res,cuda_result,sizeOfRes) ;
 
     int tpb = blockSize;
-    int bpg = (n+tpb-1)/tpb ;
+    int bpg = (resLength+tpb-1)/tpb ;
 
-    blockComputation<<<bpg,tpb>>>(cuda_result,n,m,a,p) ;
+    blockComputation<<<bpg,tpb>>>(cuda_result,resLength,m,a,p) ;
     cudaError_t err = cudaGetLastError() ;
 
 	if(err != cudaSuccess)
