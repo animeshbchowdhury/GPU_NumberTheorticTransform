@@ -7,8 +7,8 @@
 #include "../include/ntt.h" 	//INCLUDE HEADER FILE
 
 
-__global__ void blockComputation(uint64_t*,uint64_t*,uint64_t,uint64_t,uint64_t,uint64_t) ;
-void blockComp(uint64_t* , uint64_t ,uint64_t,uint64_t ,uint64_t) ;
+__global__ void blockComputation(uint64_t*,uint64_t*,uint64_t,uint64_t,uint64_t,uint64_t,uint64_t**) ;
+void blockComp(uint64_t* , uint64_t ,uint64_t,uint64_t ,uint64_t,uint64_t**) ;
 
 void cpuToGpuMemcpy(uint64_t* h_data,uint64_t* d_data,int size)
 {
@@ -45,7 +45,7 @@ void gpuToCpuMemcpy(uint64_t* d_data,uint64_t* h_data,int size)
 
 
 
-uint64_t *inPlaceNTT_DIT(uint64_t *vec, uint64_t n, uint64_t p, uint64_t r, bool rev){
+uint64_t *inPlaceNTT_DIT(uint64_t *vec, uint64_t n, uint64_t p, uint64_t r, uint64_t** twiddleFactors, bool rev){
 
 	uint64_t *result,*result_cpu;
 
@@ -82,11 +82,11 @@ uint64_t *inPlaceNTT_DIT(uint64_t *vec, uint64_t n, uint64_t p, uint64_t r, bool
 			
 				result_cpu[j + k] 	= modulo(factor1 + factor2, p);
 				result_cpu[j + k+m/2] 	= modulo(factor1 - factor2, p);
-				if(j==0)
-					std::cout<<"\nmod(a,k,p) = "<<a<<","<<k<<","<<modExp(a,k,p) ;
+				//if(j==0)
+				//	std::cout<<"\nmod(a,k,p) = "<<a<<","<<k<<","<<modExp(a,k,p) ;
 			}
 		}
-        //blockComp(result,n,m,a,p) ;
+        blockComp(result,n,m,i,p,twiddleFactors) ;
 
 	}
 	bool compCPUGPUResult = compVec(result,result_cpu,n,true) ;
@@ -95,7 +95,7 @@ uint64_t *inPlaceNTT_DIT(uint64_t *vec, uint64_t n, uint64_t p, uint64_t r, bool
 
 }
 
-void blockComp(uint64_t* res, uint64_t resLength,uint64_t blockSize,uint64_t a,uint64_t p)
+void blockComp(uint64_t* res, uint64_t resLength,uint64_t blockSize,uint64_t a,uint64_t p,uint64_t** twiddleFactors)
 {
     uint64_t *cuda_result, *cuda_output  ;
     uint64_t sizeOfRes = resLength*sizeof(uint64_t) ;
@@ -107,7 +107,7 @@ void blockComp(uint64_t* res, uint64_t resLength,uint64_t blockSize,uint64_t a,u
     int bpg = (resLength -1 + tpb)/tpb ;
 
     
-    blockComputation<<<bpg,tpb>>>(cuda_result,cuda_output,resLength,blockSize,a,p) ;
+    blockComputation<<<bpg,tpb>>>(cuda_result,cuda_output,resLength,blockSize,a,p,twiddleFactors) ;
     cudaError_t err = cudaGetLastError() ;
 
 	if(err != cudaSuccess)
@@ -120,7 +120,7 @@ void blockComp(uint64_t* res, uint64_t resLength,uint64_t blockSize,uint64_t a,u
 	cudaFree(cuda_result) ;
 }
 
-__global__ void blockComputation(uint64_t* result, uint64_t* output,uint64_t n,uint64_t m,uint64_t a,uint64_t p)
+__global__ void blockComputation(uint64_t* result, uint64_t* output,uint64_t n,uint64_t m,uint64_t a,uint64_t p,uint64_t** twiddleFactors)
 {
     
     
@@ -136,13 +136,15 @@ __global__ void blockComputation(uint64_t* result, uint64_t* output,uint64_t n,u
 	if(k < m/2)
 	{
 		factor1 = result[idx] ;
-		factor2 = modulo(modExp(a,k,p)*result[idx+m/2],p);	
+		//factor2 = modulo(modExp(a,k,p)*result[idx+m/2],p);
+		factor2 = modulo(twiddleFactors[a][k]*result[idx+m/2],p);	
 		output[idx] = modulo(factor1+factor2,p) ;
 	}
 	else
 	{
 		factor1 = result[idx - m/2] ;
-		factor2 = modulo(modExp(a,k-(m/2),p)*result[idx],p) ;
+		//factor2 = modulo(modExp(a,k-(m/2),p)*result[idx],p) ;
+		factor2 = modulo(twiddleFactors[a][k-(m/2)]*result[idx],p) ;
 		output[idx] = modulo(factor1-factor2,p) ;
 	}
     }

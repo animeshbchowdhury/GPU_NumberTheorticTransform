@@ -13,6 +13,6 @@
  * @param rev	Whether to perform bit reversal on the input vector
  * @return 	The transformed vector
  */
-uint64_t *inPlaceNTT_DIT(uint64_t *vec, uint64_t n, uint64_t p, uint64_t r, bool rev=true);
+uint64_t *inPlaceNTT_DIT(uint64_t *vec, uint64_t n, uint64_t p, uint64_t r, uint64_t** twiddleFactors, bool rev=true);
 
 #endif

@@ -14,14 +14,16 @@ int main(int argc, char *argv[]){
   uint64_t n = 4096;
   uint64_t p = 68719403009;
   uint64_t r = 36048964756;
+  uint64_t** twiddleFactorMatrix = NULL ;
 
+  twiddleFactorMatrix = preComputeTwiddleFactor(n,p,r) ;
 	uint64_t vec[n];
 
   for (int i = 0; i < n; i++){
     vec[i] = i;
   }
 
-  uint64_t *outVec = inPlaceNTT_DIT(vec,n,p,r);
+  uint64_t *outVec = inPlaceNTT_DIT(vec,n,p,r,twiddleFactorMatrix);
 
 //	printVec(outVec, n);
 
