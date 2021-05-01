@@ -31,6 +31,24 @@ void gpuToCpuMemcpy(uint64_t* d_data,uint64_t* h_data,int size)
 }
 */
 
+uint64_t* preComputeTwiddleFactor(uint64_t n,uint64_t p, uint64_t r)
+{
+	uint64_t x,y ;
+	uint64_t m,a,k_ ;
+	uint64_t* twiddleFactorArray = (uint64_t*)calloc((log2(n)*(n/2)),sizeof(uint64_t)) ;
+	uint64_t maxRow = log2(n) ;
+	uint64_t maxCol = n/2 ;
+	for(x=0;x < maxRow;x++){
+		m = pow(2,x+1) ;
+		k_ = (p-1) / m ;
+		a = modExp(r,k_,p) ;
+		for(y=0;y<m/2;y++)
+			twiddleFactorArray[ x*maxCol + y] = modExp(a,y,p) ;
+	}
+	return twiddleFactorArray ;
+}
+
+
 bool compVec(uint64_t *vec1, uint64_t *vec2, uint64_t n, bool debug){
 
 	bool comp = true;
