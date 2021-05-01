@@ -3,12 +3,33 @@
 #include <cstdlib> 		/* malloc() */
 #include <iostream>
 
-#include "../include/utils.h"	/* bit_reverse(), modExp(), modulo() */
+#include "../include/utils.cuh"	/* bit_reverse(), modExp(), modulo() */
 #include "../include/ntt.h" 	//INCLUDE HEADER FILE
 
 
 __global__ void blockComputation(uint64_t*,uint64_t,uint64_t,uint64_t,uint64_t) ;
 void blockComp(uint64_t* , uint64_t ,uint64_t,uint64_t ,uint64_t) ;
+
+void cpuToGpuMemcpy(uint64_t* h_data,uint64_t* d_data,int size)
+{
+    cudaError_t err = cudaMemcpy(d_data,h_data,size,cudaMemcpyHostToDevice) ;
+    if(err != cudaSuccess)
+    {
+            fprintf(stderr,"Failed to copy vector from host device!",cudaGetErrorString(err)) ;
+            exit(EXIT_FAILURE) ;
+    }
+}
+
+void gpuToCpuMemcpy(uint64_t* d_data,uint64_t* h_data,int size)
+{
+    cudaError_t err = cudaMemcpy(h_data,d_data,size,cudaMemcpyDeviceToHost) ;
+    if(err != cudaSuccess)
+    {
+            fprintf(stderr,"Failed to copy vector from gpu device!",cudaGetErrorString(err)) ;
+            exit(EXIT_FAILURE) ;
+    }
+    cudaFree(d_data) ;
+}
 
 
 /**
@@ -26,16 +47,20 @@ void blockComp(uint64_t* , uint64_t ,uint64_t,uint64_t ,uint64_t) ;
 
 uint64_t *inPlaceNTT_DIT(uint64_t *vec, uint64_t n, uint64_t p, uint64_t r, bool rev){
 
-	uint64_t *result;
-	uint64_t m, k_, a, factor1, factor2;
+	uint64_t *result,*result_cpu;
 
+	uint64_t m, k_, a ;
+        uint64_t factor1, factor2 ;
 	result = (uint64_t *) malloc(n*sizeof(uint64_t));
+	result_cpu = (uint64_t *) malloc(n*sizeof(uint64_t));
 
 	if(rev){
 		result = bit_reverse(vec, n);
+		result_cpu = bit_reverse(vec, n);
 	}else{
 		for(uint64_t i = 0; i < n; i++){	
 			result[i] = vec[i];
+			result_cpu[i] = vec[i];
 		}
 	}
 
@@ -46,24 +71,24 @@ uint64_t *inPlaceNTT_DIT(uint64_t *vec, uint64_t n, uint64_t p, uint64_t r, bool
 		k_ = (p - 1)/m;
 		a = modExp(r,k_,p);
 
-        /*
+        
 		for(uint64_t j = 0; j < n; j+=m){
 
 			for(uint64_t k = 0; k < m/2; k++){
 
-				factor1 = result[j + k];
-				factor2 = modulo(modExp(a,k,p)*result[j + k + m/2],p);
+				factor1 = result_cpu[j + k];
+				factor2 = modulo(modExp(a,k,p)*result_cpu[j + k + m/2],p);
 			
-				result[j + k] 		= modulo(factor1 + factor2, p);
-				result[j + k+m/2] 	= modulo(factor1 - factor2, p);
+				result_cpu[j + k] 	= modulo(factor1 + factor2, p);
+				result_cpu[j + k+m/2] 	= modulo(factor1 - factor2, p);
 
 			}
 		}
-        */
-        blockComp(result,n,m,a,p) ;
+                blockComp(result,n,m,a,p) ;
 
 	}
-
+	bool compCPUGPUResult = compVec(result,result_cpu,n,true) ;
+	std::cout<<"\nComparing output of cpu and gpu :"<<compCPUGPUResult ;
 	return result;
 
 }
@@ -75,10 +100,11 @@ void blockComp(uint64_t* res, uint64_t resLength,uint64_t blockSize,uint64_t a,u
     cudaMalloc(&cuda_result,sizeOfRes) ;
     cpuToGpuMemcpy(res,cuda_result,sizeOfRes) ;
 
-    int tpb = blockSize;
-    int bpg = (resLength+tpb-1)/tpb ;
+    int tpb = 32;//blockSize;
+    int bpg = resLength/tpb ;
 
-    blockComputation<<<bpg,tpb>>>(cuda_result,resLength,m,a,p) ;
+    
+    blockComputation<<<bpg,tpb>>>(cuda_result,resLength,blockSize,a,p) ;
     cudaError_t err = cudaGetLastError() ;
 
 	if(err != cudaSuccess)
@@ -92,8 +118,30 @@ void blockComp(uint64_t* res, uint64_t resLength,uint64_t blockSize,uint64_t a,u
 
 __global__ void blockComputation(uint64_t* result, uint64_t n,uint64_t m,uint64_t a,uint64_t p)
 {
-	int j=blockDim.x*blockIdx.x ;
-    int k=threadIdx.x ;
+    
+    
+    //uint64_t k=threadIdx.x ;
+    uint64_t idx=blockDim.x*blockIdx.x+threadIdx.x ;
+    uint64_t k ;
+    uint64_t factor1,factor2 ;
+    if(idx < (n-(n%m)))
+    {
+        //j = idx/m ;
+	k = idx%m ;
+	if(k < m/2)
+	{
+		factor1 = result[idx] ;
+		factor2 = modulo(modExp(a,k,p)*result[idx+m/2],p);	
+		result[idx] = modulo(factor1+factor2,p) ;
+	}
+	else
+	{
+		factor1 = result[idx - m/2] ;
+		factor2 = modulo(modExp(a,k-(m/2),p)*result[idx],p) ;
+		result[idx] = modulo(factor1-factor2,p) ;
+	}
+    }
+    /*
     uint64_t factor1,factor2 ;
 	if(j < n){
         if(k < m/2){
@@ -103,4 +151,5 @@ __global__ void blockComputation(uint64_t* result, uint64_t n,uint64_t m,uint64_
 		    result[j + k+m/2] 	= modulo(factor1 - factor2, p);
         }
     }
+    */
 }
