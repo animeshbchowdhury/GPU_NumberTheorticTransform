@@ -70,6 +70,7 @@ uint64_t *inPlaceNTT_DIT(uint64_t *vec, uint64_t n, uint64_t p, uint64_t r, bool
 		m = pow(2,i);
 		k_ = (p - 1)/m;
 		a = modExp(r,k_,p);
+		//std:;cout<<"\na = "<<a ;
 
         
 		for(uint64_t j = 0; j < n; j+=m){
@@ -81,10 +82,11 @@ uint64_t *inPlaceNTT_DIT(uint64_t *vec, uint64_t n, uint64_t p, uint64_t r, bool
 			
 				result_cpu[j + k] 	= modulo(factor1 + factor2, p);
 				result_cpu[j + k+m/2] 	= modulo(factor1 - factor2, p);
-
+				if(j==0)
+					std::cout<<"\nmod(a,k,p) = "<<a<<","<<k<<","<<modExp(a,k,p) ;
 			}
 		}
-        blockComp(result,n,m,a,p) ;
+        //blockComp(result,n,m,a,p) ;
 
 	}
 	bool compCPUGPUResult = compVec(result,result_cpu,n,true) ;
