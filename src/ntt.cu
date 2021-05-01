@@ -7,7 +7,7 @@
 #include "../include/ntt.h" 	//INCLUDE HEADER FILE
 
 
-__global__ void blockComputation(uint64_t*,uint64_t,uint64_t,uint64_t,uint64_t) ;
+__global__ void blockComputation(uint64_t*,uint64_t*,uint64_t,uint64_t,uint64_t,uint64_t) ;
 void blockComp(uint64_t* , uint64_t ,uint64_t,uint64_t ,uint64_t) ;
 
 void cpuToGpuMemcpy(uint64_t* h_data,uint64_t* d_data,int size)
@@ -84,7 +84,7 @@ uint64_t *inPlaceNTT_DIT(uint64_t *vec, uint64_t n, uint64_t p, uint64_t r, bool
 
 			}
 		}
-                blockComp(result,n,m,a,p) ;
+        blockComp(result,n,m,a,p) ;
 
 	}
 	bool compCPUGPUResult = compVec(result,result_cpu,n,true) ;
@@ -95,16 +95,17 @@ uint64_t *inPlaceNTT_DIT(uint64_t *vec, uint64_t n, uint64_t p, uint64_t r, bool
 
 void blockComp(uint64_t* res, uint64_t resLength,uint64_t blockSize,uint64_t a,uint64_t p)
 {
-    uint64_t* cuda_result ;
+    uint64_t *cuda_result, *cuda_output  ;
     uint64_t sizeOfRes = resLength*sizeof(uint64_t) ;
     cudaMalloc(&cuda_result,sizeOfRes) ;
+	cudaMalloc(&cuda_output,sizeOfRes) ;
     cpuToGpuMemcpy(res,cuda_result,sizeOfRes) ;
 
     int tpb = 32;//blockSize;
-    int bpg = resLength/tpb ;
+    int bpg = (resLength -1 + tpb)/tpb ;
 
     
-    blockComputation<<<bpg,tpb>>>(cuda_result,resLength,blockSize,a,p) ;
+    blockComputation<<<bpg,tpb>>>(cuda_result,cuda_output,resLength,blockSize,a,p) ;
     cudaError_t err = cudaGetLastError() ;
 
 	if(err != cudaSuccess)
@@ -113,10 +114,11 @@ void blockComp(uint64_t* res, uint64_t resLength,uint64_t blockSize,uint64_t a,u
             exit(EXIT_FAILURE) ;
 	}
 
-    gpuToCpuMemcpy(cuda_result,res,sizeOfRes) ;
+    gpuToCpuMemcpy(cuda_output,res,sizeOfRes) ;
+	cudaFree(cuda_result) ;
 }
 
-__global__ void blockComputation(uint64_t* result, uint64_t n,uint64_t m,uint64_t a,uint64_t p)
+__global__ void blockComputation(uint64_t* result, uint64_t* output,uint64_t n,uint64_t m,uint64_t a,uint64_t p)
 {
     
     
@@ -124,21 +126,22 @@ __global__ void blockComputation(uint64_t* result, uint64_t n,uint64_t m,uint64_
     uint64_t idx=blockDim.x*blockIdx.x+threadIdx.x ;
     uint64_t k ;
     uint64_t factor1,factor2 ;
-    if(idx < (n-(n%m)))
-    {
+    //if(idx < (n-(n%m)))
+    if(idx < n)
+	{
         //j = idx/m ;
 	k = idx%m ;
 	if(k < m/2)
 	{
 		factor1 = result[idx] ;
 		factor2 = modulo(modExp(a,k,p)*result[idx+m/2],p);	
-		result[idx] = modulo(factor1+factor2,p) ;
+		output[idx] = modulo(factor1+factor2,p) ;
 	}
 	else
 	{
 		factor1 = result[idx - m/2] ;
 		factor2 = modulo(modExp(a,k-(m/2),p)*result[idx],p) ;
-		result[idx] = modulo(factor1-factor2,p) ;
+		output[idx] = modulo(factor1-factor2,p) ;
 	}
     }
     /*
