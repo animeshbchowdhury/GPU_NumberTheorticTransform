@@ -8,6 +8,7 @@
 #include<cuda.h>
 #include<cuda_runtime.h>
 
+uint64_t* preComputeTwiddleFactor(uint64_t n,uint64_t p, uint64_t r) ;
 //void cpuToGpuMemcpy(uint64_t* h_data,uint64_t* d_data,uint64_t size) ;
 //void gpuToCpuMemcpy(uint64_t* d_data,uint64_t* h_data,uint64_t size) ;
 
